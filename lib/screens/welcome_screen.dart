@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:http/http.dart' as http;
 import 'under_maintenance.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -17,6 +18,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late final AnimationController _dotsController;
   bool isFinished = false;
 
+  String title = "Preparing your experience";
+
   @override
   void initState() {
     super.initState();
@@ -26,11 +29,34 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       duration: const Duration(seconds: 1),
     )..repeat();
 
+    fetchTitle();
+
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() => isFinished = true);
       }
     });
+  }
+
+  Future<void> fetchTitle() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://api.ppb.widiarrohman.my.id/api/2026/uts/B/kelompok2/check',
+        ),
+      );
+
+      print("STATUS: ${response.statusCode}");
+      print("BODY: ${response.body}");
+
+      if (response.statusCode == 200) {
+        setState(() {
+          title = response.body; // 🔥 FIX DI SINI
+        });
+      }
+    } catch (e) {
+      print("ERROR: $e");
+    }
   }
 
   @override
@@ -56,7 +82,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
-  // 🔥 SLIDE UP TRANSITION
   void goNext() {
     Navigator.push(
       context,
@@ -67,7 +92,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         transitionsBuilder: (_, animation, __, child) {
           final offsetAnimation =
               Tween<Offset>(
-                begin: const Offset(0, 1), // dari bawah
+                begin: const Offset(0, 1),
                 end: Offset.zero,
               ).animate(
                 CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
@@ -100,7 +125,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           child: SafeArea(
             child: Column(
               children: [
-                // HEADER (FLAWLESS INTEGRATED)
+                // HEADER
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -170,9 +195,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 Column(
                   children: [
-                    const Text(
-                      "Preparing your experience",
-                      style: TextStyle(
+                    Text(
+                      title,
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                       ),
@@ -199,7 +224,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 const SizedBox(height: 30),
 
-                // PROGRESS BAR
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: ClipRRect(
@@ -215,7 +239,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 const SizedBox(height: 24),
 
-                // BUTTON
                 AnimatedOpacity(
                   duration: const Duration(milliseconds: 400),
                   opacity: isFinished ? 1 : 0,
