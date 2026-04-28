@@ -26,13 +26,34 @@ class UnderMaintenanceScreen extends StatelessWidget {
                 ),
               ),
               const Spacer(flex: 2),
-              ErrorInfo(
-                title: "Under Maintenance!",
-                description:
-                    "We are currently performing scheduled maintenance. Please check back later. Thank you for your patience.",
-                // button: you can pass your custom button,
-                btnText: "Retry",
-                press: () {},
+              Column(
+                children: [
+                  ErrorInfo(
+                    title: "Under Maintenance!",
+                    description:
+                        "We are currently performing scheduled maintenance. Please check back later. Thank you for your patience.",
+                    btnText: "Retry",
+                    press: () {},
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 🔥 Tombol BACK
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context); // balik ke welcome
+                    },
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
+                      backgroundColor: Colors.grey,
+                      foregroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                    ),
+                    child: const Text("BACK"),
+                  ),
+                ],
               ),
             ],
           ),

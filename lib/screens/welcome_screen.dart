@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'under_maintenance.dart';
+import 'profile_screen.dart';
+import '../services/api_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -19,6 +21,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   bool isFinished = false;
 
   String title = "Preparing your experience";
+  String userName = "";
+  String userImage = "";
+  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
@@ -29,6 +34,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       duration: const Duration(seconds: 1),
     )..repeat();
 
+    fetchUser();
     fetchTitle();
     startLoading(); // 🔥 pakai API, bukan timer
   }
@@ -49,6 +55,25 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       }
     } catch (e) {
       print("ERROR TITLE: $e");
+    }
+  }
+
+  Future<void> fetchUser() async {
+    try {
+      final data = await _apiService.getProfile();
+
+      print("PROFILE DATA: $data");
+
+      setState(() {
+        userName = data['data']?['name'] ?? "User";
+        userImage = data['data']?['profile_picture'] ?? "";
+      });
+    } catch (e) {
+      print("ERROR: $e");
+
+      setState(() {
+        userName = "User";
+      });
     }
   }
 
@@ -113,8 +138,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 500),
         pageBuilder: (_, animation, secondaryAnimation) =>
-            const UnderMaintenancePage(),
-        transitionsBuilder: (_, animation, __, child) {
+            const UnderMaintenanceScreen(),
+        transitionsBuilder: (_, animation, _, child) {
           final offsetAnimation =
               Tween<Offset>(
                 begin: const Offset(0, 1),
@@ -155,32 +180,46 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                   child: Row(
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Center(
-                          child: Text("👋", style: TextStyle(fontSize: 20)),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProfileScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: ClipOval(
+                            child: userImage.isNotEmpty
+                                ? Image.network(userImage, fit: BoxFit.cover)
+                                : const Icon(Icons.person),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             "Welcome back",
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.white70,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            "User",
-                            style: TextStyle(
+                            userName.isEmpty
+                                ? "Loading..."
+                                : userName, // ✅ VARIABLE
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
@@ -304,5 +343,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 }
 
-const paymentProcessIllistration =
-    ''' <svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M590.84 242.27H877.06C880.922 242.27 884.625 243.804 887.355 246.535C890.086 249.265 891.62 252.968 891.62 256.83V543C891.62 546.862 890.086 550.565 887.355 553.295C884.625 556.026 880.922 557.56 877.06 557.56H805.37C744.62 557.56 686.358 533.431 643.397 490.479C600.435 447.527 576.293 389.27 576.28 328.52V256.83C576.28 252.968 577.814 249.265 580.545 246.535C583.275 243.804 586.978 242.27 590.84 242.27Z" fill="#E5E5E5"/> ... </svg> ''';
+const paymentProcessIllistration = r'''
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 124 124" fill="none">
+<rect width="124" height="124" rx="24" fill="#4DA8FF"/>
+<path d="M19.375 36.7818V100.625C19.375 102.834 21.1659 104.625 23.375 104.625H87.2181C90.7818 104.625 92.5664 100.316 90.0466 97.7966L26.2034 33.9534C23.6836 31.4336 19.375 33.2182 19.375 36.7818Z" fill="white"/>
+<circle cx="63.2109" cy="37.5391" r="18.1641" fill="#1E3A8A"/>
+<rect opacity="0.4" x="81.1328" y="80.7198" width="17.5687" height="17.3876" rx="4" transform="rotate(-45 81.1328 80.7198)" fill="#93C5FD"/>
+</svg>
+''';
