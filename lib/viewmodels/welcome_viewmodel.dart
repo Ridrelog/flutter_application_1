@@ -12,7 +12,6 @@ class WelcomeViewModel extends ChangeNotifier {
     try {
       final data = await _apiService.checkStatus();
 
-      // ⚠️ sesuaikan dengan response API
       if (data['success'] == true) {
         title = data['message'] ?? "Ready";
         statusText = "Ready to go 🚀";

@@ -30,14 +30,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     )..repeat();
 
     fetchTitle();
-
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        setState(() => isFinished = true);
-      }
-    });
+    startLoading(); // 🔥 pakai API, bukan timer
   }
 
+  // 🔥 API TITLE
   Future<void> fetchTitle() async {
     try {
       final response = await http.get(
@@ -46,17 +42,46 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         ),
       );
 
-      print("STATUS: ${response.statusCode}");
-      print("BODY: ${response.body}");
-
       if (response.statusCode == 200) {
         setState(() {
-          title = response.body; // 🔥 FIX DI SINI
+          title = response.body;
         });
       }
     } catch (e) {
-      print("ERROR: $e");
+      print("ERROR TITLE: $e");
     }
+  }
+
+  // 🔥 STREAM / POLLING API LOGS
+  void startLoading() {
+    Stream.periodic(const Duration(seconds: 2)).listen((_) async {
+      if (isFinished) return; // 🔥 stop kalau sudah selesai
+
+      try {
+        final response = await http
+            .get(
+              Uri.parse(
+                'https://api.ppb.widiarrohman.my.id/api/2026/uts/B/kelompok2/logs',
+              ),
+            )
+            .timeout(const Duration(seconds: 5));
+
+        print("STATUS: ${response.statusCode}");
+
+        // 🔥 kalau server respon apapun → anggap selesai
+        setState(() {
+          isFinished = true;
+        });
+      } catch (e) {
+        print("TIMEOUT / ERROR: $e");
+
+        // 🔥 INI KUNCI UTAMA
+        // kalau timeout → berarti proses selesai
+        setState(() {
+          isFinished = true;
+        });
+      }
+    });
   }
 
   @override
@@ -125,7 +150,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           child: SafeArea(
             child: Column(
               children: [
-                // HEADER
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -170,7 +194,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 const Spacer(),
 
-                // Illustration
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   padding: const EdgeInsets.all(24),
@@ -230,7 +253,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     borderRadius: BorderRadius.circular(10),
                     child: LinearProgressIndicator(
                       minHeight: 6,
-                      value: isFinished ? 1 : null,
+                      value: isFinished ? 1 : null, // 🔥 animasi jalan terus
                       backgroundColor: primaryBlue.withOpacity(0.15),
                       valueColor: const AlwaysStoppedAnimation(primaryBlue),
                     ),
