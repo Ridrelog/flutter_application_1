@@ -23,3 +23,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/loading.jpg
+    - assets/success.jpg
+    - assets/error.jpg

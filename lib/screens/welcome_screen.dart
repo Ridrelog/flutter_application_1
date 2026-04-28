@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'under_maintenance.dart';
 import 'profile_screen.dart';
 import '../services/api_service.dart';
+import 'dart:convert';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -19,8 +19,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   late final AnimationController _dotsController;
   bool isFinished = false;
+  bool isError = false;
+  String getCurrentImage() {
+    if (isError) return "assets/error.jpg";
+    if (isFinished) return "assets/success.jpg";
+    return "assets/loading.jpg";
+  }
 
   String title = "Preparing your experience";
+  String currentLog = "";
   String userName = "";
   String userImage = "";
   final ApiService _apiService = ApiService();
@@ -49,8 +56,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       );
 
       if (response.statusCode == 200) {
+        final jsonData = jsonDecode(response.body);
+
         setState(() {
-          title = response.body;
+          title = jsonData['data']?['title'] ?? "No Title";
         });
       }
     } catch (e) {
@@ -78,35 +87,68 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   // 🔥 STREAM / POLLING API LOGS
-  void startLoading() {
-    Stream.periodic(const Duration(seconds: 2)).listen((_) async {
-      if (isFinished) return; // 🔥 stop kalau sudah selesai
+  void startLoading() async {
+    try {
+      final request = http.Request(
+        'GET',
+        Uri.parse('https://api.ppb.widiarrohman.my.id/api/ppb2/stream/logs'),
+      );
 
-      try {
-        final response = await http
-            .get(
-              Uri.parse(
-                'https://api.ppb.widiarrohman.my.id/api/2026/uts/B/kelompok2/logs',
-              ),
-            )
-            .timeout(const Duration(seconds: 5));
+      final response = await request.send();
 
-        print("STATUS: ${response.statusCode}");
-
-        // 🔥 kalau server respon apapun → anggap selesai
+      // ❗ kalau status bukan 200
+      if (response.statusCode != 200) {
         setState(() {
-          isFinished = true;
+          isError = true;
+          currentLog = "Gagal terhubung ke server";
         });
-      } catch (e) {
-        print("TIMEOUT / ERROR: $e");
-
-        // 🔥 INI KUNCI UTAMA
-        // kalau timeout → berarti proses selesai
-        setState(() {
-          isFinished = true;
-        });
+        return;
       }
-    });
+
+      response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(
+            (line) {
+              print("RAW: $line");
+
+              if (line.startsWith("data: ")) {
+                final message = line.replaceFirst("data: ", "");
+
+                setState(() {
+                  currentLog = message;
+                });
+
+                if (message.toLowerCase().contains("selesai")) {
+                  setState(() {
+                    isFinished = true;
+                  });
+                }
+              }
+            },
+            onError: (e) {
+              setState(() {
+                isError = true;
+                currentLog = "Gagal terhubung ke server";
+              });
+            },
+            onDone: () {
+              // kalau stream berhenti tapi belum selesai
+              if (!isFinished && !isError) {
+                setState(() {
+                  isError = true;
+                  currentLog = "Proses terhenti";
+                });
+              }
+            },
+          );
+    } catch (e) {
+      // ❗ kalau API mati / tidak bisa connect
+      setState(() {
+        isError = true;
+        currentLog = "Gagal terhubung ke server";
+      });
+    }
   }
 
   @override
@@ -247,9 +289,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                     ],
                   ),
-                  child: SvgPicture.string(
-                    paymentProcessIllistration,
-                    height: 220,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    child: Image.asset(
+                      getCurrentImage(),
+                      key: ValueKey(getCurrentImage()),
+                      height: 220,
+                    ),
                   ),
                 ),
 
@@ -257,30 +303,45 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 Column(
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          isError
+                              ? "Error"
+                              : isFinished
+                              ? "Ready to go 🚀"
+                              : "Loading",
+                          style: TextStyle(
+                            color: isError
+                                ? Colors.red
+                                : isFinished
+                                ? Colors.green
+                                : Colors.grey[600],
+                          ),
+                        ),
+                        if (!isFinished && !isError) buildDots(),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // 🔥 SELALU TAMPIL LOG DARI API
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: Text(
+                        currentLog,
+                        key: ValueKey(currentLog),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isError
+                              ? Colors.red
+                              : isFinished
+                              ? Colors.green
+                              : Colors.grey,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-
-                    isFinished
-                        ? const Text(
-                            "Ready to go 🚀",
-                            style: TextStyle(color: Colors.green),
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                "Loading",
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                              buildDots(),
-                            ],
-                          ),
                   ],
                 ),
 
@@ -290,12 +351,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      minHeight: 6,
-                      value: isFinished ? 1 : null, // 🔥 animasi jalan terus
-                      backgroundColor: primaryBlue.withOpacity(0.15),
-                      valueColor: const AlwaysStoppedAnimation(primaryBlue),
-                    ),
+                    child: (isFinished)
+                        ? const SizedBox() // ❌ hilang kalau selesai
+                        : LinearProgressIndicator(
+                            minHeight: 6,
+                            value: isError ? 0 : null,
+                            backgroundColor: primaryBlue.withOpacity(0.15),
+                            valueColor: const AlwaysStoppedAnimation(
+                              primaryBlue,
+                            ),
+                          ),
                   ),
                 ),
 
@@ -303,20 +368,38 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 AnimatedOpacity(
                   duration: const Duration(milliseconds: 400),
-                  opacity: isFinished ? 1 : 0,
-                  child: isFinished
+                  opacity: isError ? 1 : 0, // ❗ hanya muncul saat error
+                  child: isError
                       ? Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: ElevatedButton(
-                            onPressed: goNext,
+                            onPressed: () async {
+                              if (isError) {
+                                setState(() {
+                                  isError = false;
+                                  isFinished = false;
+                                  currentLog = "";
+                                  title =
+                                      "Preparing your experience"; // reset juga biar UX enak
+                                });
+
+                                await fetchTitle(); // ✅ refresh title dari API
+                                await fetchUser(); // (opsional, kalau mau update user juga)
+                                startLoading(); // lanjut stream lagi
+                              } else {
+                                goNext();
+                              }
+                            },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryBlue,
+                              backgroundColor: isError
+                                  ? Colors.red
+                                  : primaryBlue,
                               minimumSize: const Size(double.infinity, 50),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Text("Continue"),
+                            child: Text(isError ? "Retry" : "Continue"),
                           ),
                         )
                       : const SizedBox(),
@@ -326,7 +409,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 AnimatedOpacity(
                   duration: const Duration(milliseconds: 400),
-                  opacity: isFinished ? 1 : 0,
+                  opacity: isFinished ? 1 : 0, // ❗ hanya muncul kalau sukses
                   child: const Text(
                     "Swipe up to continue ↑",
                     style: TextStyle(fontSize: 12, color: Colors.grey),
@@ -342,12 +425,3 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 }
-
-const paymentProcessIllistration = r'''
-<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 124 124" fill="none">
-<rect width="124" height="124" rx="24" fill="#4DA8FF"/>
-<path d="M19.375 36.7818V100.625C19.375 102.834 21.1659 104.625 23.375 104.625H87.2181C90.7818 104.625 92.5664 100.316 90.0466 97.7966L26.2034 33.9534C23.6836 31.4336 19.375 33.2182 19.375 36.7818Z" fill="white"/>
-<circle cx="63.2109" cy="37.5391" r="18.1641" fill="#1E3A8A"/>
-<rect opacity="0.4" x="81.1328" y="80.7198" width="17.5687" height="17.3876" rx="4" transform="rotate(-45 81.1328 80.7198)" fill="#93C5FD"/>
-</svg>
-''';
