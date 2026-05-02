@@ -26,6 +26,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     return "assets/loading.jpg";
   }
 
+  String apiTitle = "";
+  String apiMessage = "";
   String title = "Preparing your experience";
   String currentLog = "";
   String userName = "";
@@ -56,14 +58,26 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       );
 
       if (response.statusCode == 200) {
-        final jsonData = jsonDecode(response.body);
+        final body = response.body;
 
-        setState(() {
-          title = jsonData['data']?['title'] ?? "No Title";
-        });
+        try {
+          // 🔹 COBA PARSE JSON
+          final jsonData = jsonDecode(body);
+
+          setState(() {
+            apiTitle = jsonData['data']?['title'] ?? "";
+            apiMessage = jsonData['message'] ?? "";
+          });
+        } catch (e) {
+          // 🔥 FALLBACK: kalau bukan JSON → pakai text langsung
+          setState(() {
+            apiTitle = body;
+            apiMessage = "";
+          });
+        }
       }
     } catch (e) {
-      print("ERROR TITLE: $e");
+      print("ERROR API CHECK: $e");
     }
   }
 
@@ -217,6 +231,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           child: SafeArea(
             child: Column(
               children: [
+                // 🔹 HEADER PROFILE
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -258,9 +273,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            userName.isEmpty
-                                ? "Loading..."
-                                : userName, // ✅ VARIABLE
+                            userName.isEmpty ? "Loading..." : userName,
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -273,8 +286,43 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   ),
                 ),
 
+                // 🔥 API TEXT (FIX POSISI & SELALU MUNCUL)
+                const SizedBox(height: 20),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
+                      Text(
+                        apiTitle.isEmpty ? "" : apiTitle,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      if (apiMessage.isNotEmpty)
+                        Text(
+                          apiMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                            height: 1.4,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // 🔹 PINDAHKAN SPACER KE SINI
                 const Spacer(),
 
+                // 🔹 CARD GAMBAR (TETAP)
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   padding: const EdgeInsets.all(24),
@@ -301,6 +349,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 const Spacer(),
 
+                // 🔹 STATUS & LOG (TETAP)
                 Column(
                   children: [
                     Row(
@@ -323,10 +372,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         if (!isFinished && !isError) buildDots(),
                       ],
                     ),
-
                     const SizedBox(height: 12),
-
-                    // 🔥 SELALU TAMPIL LOG DARI API
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 300),
                       child: Text(
@@ -347,12 +393,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 const SizedBox(height: 30),
 
+                // 🔹 PROGRESS BAR (TETAP)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: (isFinished)
-                        ? const SizedBox() // ❌ hilang kalau selesai
+                        ? const SizedBox()
                         : LinearProgressIndicator(
                             minHeight: 6,
                             value: isError ? 0 : null,
@@ -366,9 +413,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 const SizedBox(height: 24),
 
+                // 🔹 BUTTON ERROR (TETAP)
                 AnimatedOpacity(
                   duration: const Duration(milliseconds: 400),
-                  opacity: isError ? 1 : 0, // ❗ hanya muncul saat error
+                  opacity: isError ? 1 : 0,
                   child: isError
                       ? Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -379,13 +427,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   isError = false;
                                   isFinished = false;
                                   currentLog = "";
-                                  title =
-                                      "Preparing your experience"; // reset juga biar UX enak
+                                  title = "Preparing your experience";
                                 });
 
-                                await fetchTitle(); // ✅ refresh title dari API
-                                await fetchUser(); // (opsional, kalau mau update user juga)
-                                startLoading(); // lanjut stream lagi
+                                await fetchTitle();
+                                await fetchUser();
+                                startLoading();
                               } else {
                                 goNext();
                               }
@@ -409,7 +456,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 AnimatedOpacity(
                   duration: const Duration(milliseconds: 400),
-                  opacity: isFinished ? 1 : 0, // ❗ hanya muncul kalau sukses
+                  opacity: isFinished ? 1 : 0,
                   child: const Text(
                     "Swipe up to continue ↑",
                     style: TextStyle(fontSize: 12, color: Colors.grey),
