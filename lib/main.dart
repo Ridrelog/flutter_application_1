@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
-import 'screens/welcome_screen.dart';
 import 'package:provider/provider.dart';
+
+import 'screens/welcome_screen.dart';
 import 'viewmodels/profile_viewmodel.dart';
+import 'viewmodels/welcome_viewmodel.dart';
+import 'viewmodels/under_maintenance_viewmodel.dart';
 
 void main() {
   runApp(
     MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => ProfileViewModel())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => ProfileViewModel()),
+        ChangeNotifierProvider(create: (_) => WelcomeViewModel()),
+        ChangeNotifierProvider(create: (_) => UnderMaintenanceViewModel()),
+      ],
       child: const MyApp(),
     ),
   );

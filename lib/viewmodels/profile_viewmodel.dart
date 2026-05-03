@@ -7,23 +7,36 @@ class ProfileViewModel extends ChangeNotifier {
   String name = "";
   String email = "";
   String imageUrl = "";
+  String status = "";
+  String message = "";
   bool isLoading = false;
+  bool hasError = false;
 
   Future<void> fetchProfile() async {
     isLoading = true;
+    hasError = false;
     notifyListeners();
 
     try {
       final data = await _apiService.getProfile();
 
-      if (data['status'] == "success") {
+      status = data['status'] ?? "";
+      message = data['message'] ?? "";
+
+      if (status == "success") {
         name = data['data']['name'] ?? "No Name";
         email = data['data']['email'] ?? "No Email";
         imageUrl = data['data']['profile_picture'] ?? "";
+      } else {
+        hasError = true;
       }
     } catch (e) {
-      name = "Error";
-      email = "Failed to load";
+      hasError = true;
+      status = "Gagal Mengambil Data";
+      message = "Gagal Terhubung ke Server";
+      name = "                    ";
+      email = "                     ";
+      imageUrl = "";
     }
 
     isLoading = false;

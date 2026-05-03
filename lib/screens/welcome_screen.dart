@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'under_maintenance.dart';
 import 'profile_screen.dart';
-import '../services/api_service.dart';
+import '../viewmodels/welcome_viewmodel.dart';
+import '../viewmodels/profile_viewmodel.dart';
 import 'dart:convert';
 
 class WelcomeScreen extends StatefulWidget {
@@ -20,19 +22,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late final AnimationController _dotsController;
   bool isFinished = false;
   bool isError = false;
+
   String getCurrentImage() {
     if (isError) return "assets/error.jpg";
     if (isFinished) return "assets/success.jpg";
     return "assets/loading.jpg";
   }
 
-  String apiTitle = "";
-  String apiMessage = "";
   String title = "Preparing your experience";
   String currentLog = "";
-  String userName = "";
-  String userImage = "";
-  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
@@ -43,64 +41,21 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       duration: const Duration(seconds: 1),
     )..repeat();
 
-    fetchUser();
-    fetchTitle();
-    startLoading(); // 🔥 pakai API, bukan timer
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      fetchUser();
+      fetchTitle();
+      startLoading();
+    });
   }
 
-  // 🔥 API TITLE
   Future<void> fetchTitle() async {
-    try {
-      final response = await http.get(
-        Uri.parse(
-          'https://api.ppb.widiarrohman.my.id/api/2026/uts/B/kelompok2/check',
-        ),
-      );
-
-      if (response.statusCode == 200) {
-        final body = response.body;
-
-        try {
-          // 🔹 COBA PARSE JSON
-          final jsonData = jsonDecode(body);
-
-          setState(() {
-            apiTitle = jsonData['data']?['title'] ?? "";
-            apiMessage = jsonData['message'] ?? "";
-          });
-        } catch (e) {
-          // 🔥 FALLBACK: kalau bukan JSON → pakai text langsung
-          setState(() {
-            apiTitle = body;
-            apiMessage = "";
-          });
-        }
-      }
-    } catch (e) {
-      print("ERROR API CHECK: $e");
-    }
+    await context.read<WelcomeViewModel>().fetchTitle();
   }
 
   Future<void> fetchUser() async {
-    try {
-      final data = await _apiService.getProfile();
-
-      print("PROFILE DATA: $data");
-
-      setState(() {
-        userName = data['data']?['name'] ?? "User";
-        userImage = data['data']?['profile_picture'] ?? "";
-      });
-    } catch (e) {
-      print("ERROR: $e");
-
-      setState(() {
-        userName = "User";
-      });
-    }
+    await context.read<ProfileViewModel>().fetchProfile();
   }
 
-  // 🔥 STREAM / POLLING API LOGS
   void startLoading() async {
     try {
       final request = http.Request(
@@ -110,7 +65,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
       final response = await request.send();
 
-      // ❗ kalau status bukan 200
       if (response.statusCode != 200) {
         setState(() {
           isError = true;
@@ -147,7 +101,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               });
             },
             onDone: () {
-              // kalau stream berhenti tapi belum selesai
               if (!isFinished && !isError) {
                 setState(() {
                   isError = true;
@@ -157,7 +110,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             },
           );
     } catch (e) {
-      // ❗ kalau API mati / tidak bisa connect
       setState(() {
         isError = true;
         currentLog = "Gagal terhubung ke server";
@@ -210,8 +162,23 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
+  IconData getStatusIcon() {
+    if (isError) return Icons.error_rounded;
+    if (isFinished) return Icons.check_circle_rounded;
+    return Icons.hourglass_top_rounded;
+  }
+
+  Color getStatusColor() {
+    if (isError) return Colors.red;
+    if (isFinished) return Colors.green;
+    return primaryBlue;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final welcomeViewModel = context.watch<WelcomeViewModel>();
+    final profileViewModel = context.watch<ProfileViewModel>();
+
     return Scaffold(
       body: GestureDetector(
         onVerticalDragEnd: (details) {
@@ -229,13 +196,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ),
           child: SafeArea(
-            child: Column(
-              children: [
-                // 🔹 HEADER PROFILE
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                  child: Row(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 16, 22, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // HEADER PROFILE
+                  Row(
                     children: [
                       GestureDetector(
                         onTap: () {
@@ -247,180 +214,312 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           );
                         },
                         child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                          width: 48,
+                          height: 48,
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
                             shape: BoxShape.circle,
                           ),
                           child: ClipOval(
-                            child: userImage.isNotEmpty
-                                ? Image.network(userImage, fit: BoxFit.cover)
-                                : const Icon(Icons.person),
+                            child: profileViewModel.imageUrl.isNotEmpty
+                                ? Image.network(
+                                    profileViewModel.imageUrl,
+                                    fit: BoxFit.cover,
+                                  )
+                                : const Icon(
+                                    Icons.person_rounded,
+                                    color: primaryBlue,
+                                  ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Welcome back",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white70,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Selamat Datang kembali",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            userName.isEmpty ? "Loading..." : userName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                            const SizedBox(height: 3),
+                            Text(
+                              profileViewModel.name.isEmpty
+                                  ? "Loading..."
+                                  : profileViewModel.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 🔥 API TEXT (FIX POSISI & SELALU MUNCUL)
-                const SizedBox(height: 20),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      Text(
-                        apiTitle.isEmpty ? "" : apiTitle,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      if (apiMessage.isNotEmpty)
-                        Text(
-                          apiMessage,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                            height: 1.4,
-                          ),
+                      IconButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProfileScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.manage_accounts_rounded,
+                          color: Colors.white,
+                          size: 28,
                         ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // 🔹 PINDAHKAN SPACER KE SINI
-                const Spacer(),
-
-                // 🔹 CARD GAMBAR (TETAP)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
-                        blurRadius: 25,
-                        offset: const Offset(0, 12),
                       ),
                     ],
                   ),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 400),
-                    child: Image.asset(
-                      getCurrentImage(),
-                      key: ValueKey(getCurrentImage()),
-                      height: 220,
+
+                  const SizedBox(height: 38),
+
+                  // STATUS CHIP
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
                     ),
-                  ),
-                ),
-
-                const Spacer(),
-
-                // 🔹 STATUS & LOG (TETAP)
-                Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(
+                          getStatusIcon(),
+                          size: 17,
+                          color: getStatusColor(),
+                        ),
+                        const SizedBox(width: 6),
                         Text(
                           isError
-                              ? "Error"
+                              ? "Gagal Terhubung ke API"
                               : isFinished
-                              ? "Ready to go 🚀"
-                              : "Loading",
+                              ? "Terhubung ke API"
+                              : "Tunggu Bentar Ya...",
                           style: TextStyle(
-                            color: isError
-                                ? Colors.red
-                                : isFinished
-                                ? Colors.green
-                                : Colors.grey[600],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: getStatusColor(),
                           ),
                         ),
-                        if (!isFinished && !isError) buildDots(),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: Text(
-                        currentLog,
-                        key: ValueKey(currentLog),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isError
-                              ? Colors.red
-                              : isFinished
-                              ? Colors.green
-                              : Colors.grey,
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // TITLE
+                  Text(
+                    welcomeViewModel.apiTitle.isEmpty
+                        ? "Flutter Library Welcome Screen"
+                        : welcomeViewModel.apiTitle,
+                    textAlign: TextAlign.left,
+                    style: const TextStyle(
+                      fontSize: 31,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
+                      height: 1.12,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  if (welcomeViewModel.apiMessage.isNotEmpty)
+                    Text(
+                      welcomeViewModel.apiMessage,
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                        height: 1.55,
+                      ),
+                    ),
+
+                  const SizedBox(height: 22),
+
+                  // IMAGE + STATUS CARD
+                  Expanded(
+                    child: Center(
+                      child: Transform.translate(
+                        offset: const Offset(0, -70), // <- ini yang bikin naik
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.07),
+                                blurRadius: 22,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 135,
+                                height: 135,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Container(
+                                      width: 118,
+                                      height: 118,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: primaryBlue.withOpacity(0.08),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 10,
+                                      top: 16,
+                                      child: Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: secondaryBlue.withOpacity(
+                                            0.95,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      left: 12,
+                                      bottom: 18,
+                                      child: Container(
+                                        width: 28,
+                                        height: 28,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: primaryBlue.withOpacity(0.14),
+                                        ),
+                                      ),
+                                    ),
+                                    AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 400,
+                                      ),
+                                      child: Image.asset(
+                                        getCurrentImage(),
+                                        key: ValueKey(getCurrentImage()),
+                                        height: 120,
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: getStatusColor().withOpacity(
+                                          0.12,
+                                        ),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Icon(
+                                        getStatusIcon(),
+                                        color: getStatusColor(),
+                                        size: 25,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            isError
+                                                ? "Error"
+                                                : isFinished
+                                                ? "Ready to go 🚀"
+                                                : "Loading",
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w900,
+                                              color: getStatusColor(),
+                                            ),
+                                          ),
+                                        ),
+                                        if (!isFinished && !isError)
+                                          buildDots(),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
+                                      child: Text(
+                                        currentLog.isEmpty
+                                            ? "Starting process..."
+                                            : currentLog,
+                                        key: ValueKey(currentLog),
+                                        textAlign: TextAlign.left,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isError
+                                              ? Colors.red
+                                              : isFinished
+                                              ? Colors.green
+                                              : Colors.grey[600],
+                                          height: 1.45,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ],
-                ),
-
-                const SizedBox(height: 30),
-
-                // 🔹 PROGRESS BAR (TETAP)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: (isFinished)
-                        ? const SizedBox()
-                        : LinearProgressIndicator(
-                            minHeight: 6,
-                            value: isError ? 0 : null,
-                            backgroundColor: primaryBlue.withOpacity(0.15),
-                            valueColor: const AlwaysStoppedAnimation(
-                              primaryBlue,
-                            ),
-                          ),
                   ),
-                ),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
-                // 🔹 BUTTON ERROR (TETAP)
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 400),
-                  opacity: isError ? 1 : 0,
-                  child: isError
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: ElevatedButton(
+                  // PROGRESS BAR
+                  if (!isFinished)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(30),
+                      child: LinearProgressIndicator(
+                        minHeight: 7,
+                        value: isError ? 0 : null,
+                        backgroundColor: primaryBlue.withOpacity(0.15),
+                        valueColor: const AlwaysStoppedAnimation(primaryBlue),
+                      ),
+                    ),
+
+                  const SizedBox(height: 18),
+
+                  // ERROR BUTTON
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 400),
+                    opacity: isError ? 1 : 0,
+                    child: isError
+                        ? ElevatedButton.icon(
                             onPressed: () async {
                               if (isError) {
                                 setState(() {
@@ -437,34 +536,57 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                 goNext();
                               }
                             },
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: Text(isError ? "Refresh" : "Continue"),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isError
                                   ? Colors.red
                                   : primaryBlue,
-                              minimumSize: const Size(double.infinity, 50),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              minimumSize: const Size(double.infinity, 52),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(18),
                               ),
                             ),
-                            child: Text(isError ? "Retry" : "Continue"),
-                          ),
-                        )
-                      : const SizedBox(),
-                ),
-
-                const SizedBox(height: 12),
-
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 400),
-                  opacity: isFinished ? 1 : 0,
-                  child: const Text(
-                    "Swipe up to continue ↑",
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                          )
+                        : const SizedBox(),
                   ),
-                ),
 
-                const Spacer(),
-              ],
+                  if (isFinished)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.keyboard_arrow_up_rounded,
+                              size: 20,
+                              color: primaryBlue,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              "Scroll ke atas untuk melanjutkan",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: primaryBlue,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
