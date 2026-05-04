@@ -22,6 +22,41 @@ class _UnderMaintenanceScreenState extends State<UnderMaintenanceScreen> {
     });
   }
 
+  void showFullImage(BuildContext context, String image) {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(12),
+          child: Stack(
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4,
+                  child: Image.asset('assets/$image'),
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<UnderMaintenanceViewModel>(
@@ -202,9 +237,14 @@ class _UnderMaintenanceScreenState extends State<UnderMaintenanceScreen> {
                     ),
                   ),
                   const SizedBox(height: 22),
-                  SizedBox(
-                    width: 220,
-                    child: Image.asset('assets/$image', fit: BoxFit.contain),
+                  GestureDetector(
+                    onTap: () {
+                      showFullImage(context, image);
+                    },
+                    child: SizedBox(
+                      width: 220,
+                      child: Image.asset('assets/$image', fit: BoxFit.contain),
+                    ),
                   ),
                   const SizedBox(height: 24),
                   Text(
