@@ -149,10 +149,6 @@ class _UnderMaintenanceScreenState extends State<UnderMaintenanceScreen> {
               ],
             ),
           ),
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close_rounded, color: Colors.white),
-          ),
         ],
       ),
     );

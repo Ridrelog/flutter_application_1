@@ -204,16 +204,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   // HEADER PROFILE
                   Row(
                     children: [
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ProfileScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
+                       Container(
                           width: 48,
                           height: 48,
                           padding: const EdgeInsets.all(2),
@@ -233,7 +224,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   ),
                           ),
                         ),
-                      ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
